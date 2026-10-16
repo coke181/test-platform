@@ -161,6 +161,7 @@ def main():
     parser.add_argument("--token", default=os.environ.get("TEST_PLATFORM_TOKEN", ""))
     parser.add_argument("--evidence", nargs="*", default=[], help="要一起上报的证据文件路径")
     args = parser.parse_args()
+    args.token = (args.token or "").strip().lstrip("\ufeff")
 
     report = load_report(args.input)
     suite = build_junit(report)

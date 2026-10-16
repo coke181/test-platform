@@ -29,7 +29,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 公网部署时设置 TEST_PLATFORM_TOKEN，写入接口将强制校验；
 # 本地开发不设置则保持无鉴权，方便快速联调。
-PLATFORM_API_TOKEN = os.environ.get("TEST_PLATFORM_TOKEN", "")
+PLATFORM_API_TOKEN = (os.environ.get("TEST_PLATFORM_TOKEN", "") or "").strip().lstrip("\ufeff")
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 TEXT_EXTS = {".log", ".txt", ".json", ".xml", ".html", ".md", ".csv"}
