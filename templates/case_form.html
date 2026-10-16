@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if case %}编辑用例{% else %}新建用例{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if case %}编辑用例{% else %}新建用例{% endif %}</h1>
+<form method="post" class="panel wide">
+  <label>标题 *</label>
+  <input type="text" name="title" value="{{ case['title'] if case else '' }}" required>
+  <label>所属项目</label>
+  <input type="text" name="project" value="{{ case['project'] if case else '默认项目' }}" placeholder="例如：model / blaster">
+  <label>所属模块</label>
+  <input type="text" name="module" value="{{ case['module'] if case else '' }}" placeholder="例如：登录 / 支付 / 联机同步">
+  <label>优先级</label>
+  <select name="priority">
+    {% for p in ['P0','P1','P2','P3'] %}
+      <option value="{{ p }}" {% if (case and case['priority'] == p) or (not case and p == 'P2') %}selected{% endif %}>{{ p }}</option>
+    {% endfor %}
+  </select>
+  <label>前置条件</label>
+  <textarea name="precondition" rows="3">{{ case['precondition'] if case else '' }}</textarea>
+  <label>操作步骤</label>
+  <textarea name="steps" rows="5">{{ case['steps'] if case else '' }}</textarea>
+  <label>预期结果</label>
+  <textarea name="expected" rows="3">{{ case['expected'] if case else '' }}</textarea>
+  <div class="toolbar">
+    <button type="submit">保存</button>
+    <a class="btn-secondary" href="{{ url_for('library') }}">取消</a>
+  </div>
+</form>
+{% endblock %}

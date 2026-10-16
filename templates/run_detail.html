@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ run['name'] }} - 运行详情{% endblock %}
 {% block content %}
-<h1>{{ run['name'] }}</h1>
-<p class="muted">导入时间：{{ run['imported_at'] }} &nbsp;|&nbsp; 耗时 {{ run['duration'] }}s</p>
+<div class="detail-actions">
+  <h1>{{ run['name'] }}</h1>
+  <form class="inline-form" method="post" action="{{ url_for('delete_run', run_id=run['id']) }}" onsubmit="return confirm('确认删除该运行记录及其用例？')">
+    <button class="btn-danger" type="submit">删除本次记录</button>
+  </form>
+</div>
+<p class="muted">项目：<span class="badge project">{{ run['project'] }}</span> &nbsp;|&nbsp; 导入时间：{{ run['imported_at'] }} &nbsp;|&nbsp; 耗时 {{ run['duration'] }}s</p>
 <div class="cards">
   <div class="card"><div class="num">{{ run['total'] }}</div><div class="label">总数</div></div>
   <div class="card"><div class="num green">{{ run['passed'] }}</div><div class="label">通过</div></div>
@@ -13,7 +18,7 @@
 
 <h2>用例明细</h2>
 <table>
-  <thead><tr><th>状态</th><th>用例</th><th>类</th><th>文件</th><th>耗时(s)</th></tr></thead>
+  <thead><tr><th>状态</th><th>用例</th><th>类</th><th>文件</th><th>耗时(s)</th><th>证据</th></tr></thead>
   <tbody>
   {% for c in cases %}
     <tr>
@@ -22,11 +27,57 @@
       <td class="muted">{{ c['classname'] }}</td>
       <td class="muted">{{ c['file'] }}{% if c['line'] %}:{{ c['line'] }}{% endif %}</td>
       <td>{{ c['time'] }}</td>
+      <td class="nowrap">
+        {% for a in attachments_by_case.get(c['id'], []) %}
+          {% if a['kind'] == 'image' %}
+            <a href="/uploads/{{ a['stored_name'] }}" target="_blank" title="{{ a['filename'] }}"><img src="/uploads/{{ a['stored_name'] }}" style="height: 34px; vertical-align: middle; border-radius: 4px;"></a>
+          {% elif a['kind'] == 'log' %}
+            <a href="/uploads/{{ a['stored_name'] }}" target="_blank">📄 日志</a>
+          {% elif a['kind'] == 'text' %}
+            <a href="/uploads/{{ a['stored_name'] }}" target="_blank">📄 文本</a>
+          {% else %}
+            <a href="/uploads/{{ a['stored_name'] }}" target="_blank">📎 {{ a['filename'] }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if c['status'] in ('failed', 'error') %}
+          <form class="inline-form" method="post" enctype="multipart/form-data" action="{{ url_for('upload_run_attachment', run_id=run['id']) }}">
+            <input type="hidden" name="case_id" value="{{ c['id'] }}">
+            <input type="file" name="file" multiple style="max-width: 120px; font-size: 12px;">
+            <button class="btn-danger" type="submit">传证据</button>
+          </form>
+        {% endif %}
+      </td>
     </tr>
     {% if c['message'] %}
-    <tr class="failure-row"><td colspan="5"><pre>{{ c['message'] }}</pre></td></tr>
+    <tr class="failure-row"><td colspan="6"><pre>{{ c['message'] }}</pre></td></tr>
     {% endif %}
+    {% for a in attachments_by_case.get(c['id'], []) if a['kind'] in ('log', 'text') %}
+    <tr class="failure-row"><td colspan="6"><strong class="muted">附件：{{ a['filename'] }}</strong><pre>{{ attachment_content.get(a['id'], '') }}</pre></td></tr>
+    {% endfor %}
   {% endfor %}
   </tbody>
 </table>
+
+<h2>运行级证据</h2>
+<div class="panel wide">
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('upload_run_attachment', run_id=run['id']) }}">
+    <label>上传本次运行的证据（截图 / 日志，不关联具体用例）</label>
+    <input type="file" name="file" multiple>
+    <button class="btn" type="submit">上传证据</button>
+  </form>
+  {% for a in run_attachments %}
+    <div style="margin-top: 10px;">
+      {% if a['kind'] == 'image' %}
+        <a href="/uploads/{{ a['stored_name'] }}" target="_blank"><img src="/uploads/{{ a['stored_name'] }}" style="max-height: 180px; border-radius: 6px; border: 1px solid #e2e8f0;"></a>
+      {% else %}
+        <a href="/uploads/{{ a['stored_name'] }}" target="_blank">📎 {{ a['filename'] }}</a>
+      {% endif %}
+      {% if a['kind'] in ('log', 'text') %}
+        <pre>{{ attachment_content.get(a['id'], '') }}</pre>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="muted">暂无运行级证据。失败用例的截图或日志可在这里归档，方便复盘“为什么挂”。</p>
+  {% endfor %}
+</div>
 {% endblock %}

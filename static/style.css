@@ -41,3 +41,29 @@ pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; ov
 .trend-bar { flex: 1; height: 14px; background: #eef2f6; border-radius: 999px; overflow: hidden; }
 .trend-fill { height: 100%; background: #15803d; border-radius: 999px; }
 .trend-rate { width: 60px; text-align: right; font-size: 13px; color: #15803d; font-weight: 600; }
+
+.toolbar { margin: 10px 0; }
+.btn { display: inline-block; background: #1f4e79; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 6px; border: 0; cursor: pointer; }
+.btn-secondary { display: inline-block; background: #e2e8f0; color: #1c2733; text-decoration: none; padding: 8px 14px; border-radius: 6px; border: 0; cursor: pointer; margin-left: 8px; }
+.btn-danger { background: #b91c1c; color: #fff; border: 0; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.inline-form { display: inline; }
+.nowrap { white-space: nowrap; }
+.panel.wide { max-width: 760px; }
+.panel select, .panel textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 4px; }
+.badge.pri.p0 { background: #fee2e2; color: #b91c1c; }
+.badge.pri.p1 { background: #ffedd5; color: #c2410c; }
+.badge.pri.p2 { background: #fef9c3; color: #a16207; }
+.badge.pri.p3 { background: #f1f5f9; color: #64748b; }
+.detail-actions { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+.badge.project { background: #e0f2fe; color: #0369a1; }
+
+.badge.chg.new_failure { background: #fee2e2; color: #b91c1c; }
+.badge.chg.still_failing { background: #fee2e2; color: #b91c1c; }
+.badge.chg.fixed { background: #dcfce7; color: #15803d; }
+.badge.chg.still_skip { background: #f1f5f9; color: #64748b; }
+.badge.chg.removed { background: #f1f5f9; color: #64748b; }
+.badge.chg.new_skip { background: #f1f5f9; color: #64748b; }
+.badge.chg.new_pass { background: #dcfce7; color: #15803d; }
+.badge.chg.changed { background: #ffedd5; color: #c2410c; }
+.badge.chg.unchanged { background: #f8fafc; color: #94a3b8; }
+.filter label { align-self: center; color: #475569; font-size: 13px; }

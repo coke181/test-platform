@@ -1,8 +1,9 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    project TEXT NOT NULL DEFAULT '默认项目',
     started_at TEXT,
     total INTEGER DEFAULT 0,
     passed INTEGER DEFAULT 0,
@@ -25,5 +26,29 @@ CREATE TABLE IF NOT EXISTS cases (
     message TEXT,
     traceback TEXT,
     FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS test_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    module TEXT,
+    priority TEXT DEFAULT 'P2',
+    precondition TEXT,
+    steps TEXT,
+    expected TEXT,
+    project TEXT DEFAULT '默认项目',
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER,
+    case_id INTEGER,
+    kind TEXT,
+    filename TEXT,
+    stored_name TEXT,
+    created_at TEXT,
+    FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
 );
 """

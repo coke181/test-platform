@@ -1,5 +1,24 @@
 {% extends "base.html" %}
-{% block title %}仪表盘 - 测试报告平台<h2>通过率趋势</h2>
+{% block title %}仪表盘 - 测试报告平台{% endblock %}
+{% block content %}
+<h1>仪表盘</h1>
+<form class="filter" method="get">
+  <select name="project">
+    <option value="">全部项目</option>
+    {% for p in projects %}<option value="{{ p }}" {% if project == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <button type="submit">切换项目</button>
+</form>
+<div class="cards">
+  <div class="card"><div class="num">{{ agg['total'] }}</div><div class="label">累计用例</div></div>
+  <div class="card"><div class="num green">{{ agg['passed'] }}</div><div class="label">通过</div></div>
+  <div class="card"><div class="num red">{{ agg['failed'] + agg['errors'] }}</div><div class="label">失败/错误</div></div>
+  <div class="card"><div class="num">{{ pass_rate }}%</div><div class="label">通过率</div></div>
+  <div class="card"><div class="num">{{ total_runs }}</div><div class="label">运行次数</div></div>
+  <div class="card"><div class="num">{{ manual_count }}</div><div class="label">用例库</div></div>
+</div>
+
+<h2>通过率趋势</h2>
 <div class="trends">
 {% for t in trends %}
   {% set rate = (t['passed'] / t['total'] * 100) if t['total'] else 0 %}
@@ -8,36 +27,48 @@
     <div class="trend-bar"><div class="trend-fill" style="width: {{ '%.1f'|format(rate) }}%"></div></div>
     <div class="trend-rate">{{ '%.1f'|format(rate) }}%</div>
   </div>
+{% else %}
+  <div class="muted">暂无运行数据。</div>
 {% endfor %}
-</div>
-{% endblock %}
-{% block content %}
-<h1>仪表盘</h1>
-<div class="cards">
-  <div class="card"><div class="num">{{ agg['total'] }}</div><div class="label">累计用例</div></div>
-  <div class="card"><div class="num green">{{ agg['passed'] }}</div><div class="label">通过</div></div>
-  <div class="card"><div class="num red">{{ agg['failed'] + agg['errors'] }}</div><div class="label">失败/错误</div></div>
-  <div class="card"><div class="num">{{ pass_rate }}%</div><div class="label">通过率</div></div>
-  <div class="card"><div class="num">{{ total_runs }}</div><div class="label">运行次数</div></div>
 </div>
 
 <h2>最近运行</h2>
 <table>
-  <thead><tr><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>耗时(s)</th><th>操作</th></tr></thead>
+  <thead><tr><th>项目</th><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>通过率</th><th>耗时(s)</th><th>操作</th></tr></thead>
   <tbody>
   {% for r in recent %}
+    {% set rate = (r['passed'] / r['total'] * 100) if r['total'] else 0 %}
     <tr>
+      <td><span class="badge project">{{ r['project'] }}</span></td>
       <td>{{ r['name'] }}</td>
       <td>{{ r['total'] }}</td>
       <td class="green">{{ r['passed'] }}</td>
       <td class="red">{{ r['failed'] }}</td>
       <td class="red">{{ r['errors'] }}</td>
       <td>{{ r['skipped'] }}</td>
+      <td>{{ '%.1f'|format(rate) }}%</td>
       <td>{{ r['duration'] }}</td>
       <td><a href="{{ url_for('run_detail', run_id=r['id']) }}">查看</a></td>
     </tr>
   {% else %}
-    <tr><td colspan="8">还没有数据，先 <a href="{{ url_for('import_page') }}">导入一份报告</a>。</td></tr>
+    <tr><td colspan="10">还没有数据，先 <a href="{{ url_for('import_page') }}">导入一份报告</a>。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>最近失败用例</h2>
+<table>
+  <thead><tr><th>状态</th><th>用例</th><th>所属运行</th><th>失败信息</th></tr></thead>
+  <tbody>
+  {% for c in recent_failures %}
+    <tr>
+      <td><span class="badge {{ c['status'] }}">{{ c['status'] }}</span></td>
+      <td>{{ c['name'] }}</td>
+      <td><a href="{{ url_for('run_detail', run_id=c['run_id']) }}">{{ c['run_name'] }}</a></td>
+      <td class="muted">{{ c['message'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">没有失败用例，表现很好。</td></tr>
   {% endfor %}
   </tbody>
 </table>

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}运行对比 - 测试报告平台{% endblock %}
+{% block content %}
+<h1>运行对比（回归）</h1>
+<form class="filter" method="get">
+  <label>基准运行</label>
+  <select name="base">
+    <option value="">请选择</option>
+    {% for r in runs %}
+      <option value="{{ r['id'] }}" {% if base_id == r['id'] %}selected{% endif %}>#{{ r['id'] }} {{ r['project'] }} / {{ r['name'] }} ({{ r['imported_at'] }})</option>
+    {% endfor %}
+  </select>
+  <label>对比运行</label>
+  <select name="target">
+    <option value="">请选择</option>
+    {% for r in runs %}
+      <option value="{{ r['id'] }}" {% if target_id == r['id'] %}selected{% endif %}>#{{ r['id'] }} {{ r['project'] }} / {{ r['name'] }} ({{ r['imported_at'] }})</option>
+    {% endfor %}
+  </select>
+  <button type="submit">开始对比</button>
+</form>
+
+{% if comparison %}
+<div class="cards">
+  <div class="card"><div class="num">#{{ comparison['base']['id'] }}</div><div class="label">基准：{{ comparison['base']['name'] }}（{{ comparison['base']['passed'] }}/{{ comparison['base']['total'] }} 通过）</div></div>
+  <div class="card"><div class="num">#{{ comparison['target']['id'] }}</div><div class="label">对比：{{ comparison['target']['name'] }}（{{ comparison['target']['passed'] }}/{{ comparison['target']['total'] }} 通过）</div></div>
+  <div class="card"><div class="num red">{{ comparison['counts'].get('new_failure', 0) }}</div><div class="label">新增失败</div></div>
+  <div class="card"><div class="num red">{{ comparison['counts'].get('still_failing', 0) }}</div><div class="label">仍失败</div></div>
+  <div class="card"><div class="num green">{{ comparison['counts'].get('fixed', 0) }}</div><div class="label">已修复</div></div>
+  <div class="card"><div class="num">{{ comparison['counts'].get('removed', 0) }}</div><div class="label">已移除</div></div>
+</div>
+
+<h2>用例变化明细</h2>
+<p class="muted">按严重程度排序：新增失败 &gt; 仍失败 &gt; 已修复 &gt; 已移除 &gt; 其余变化。</p>
+<table>
+  <thead><tr><th>变化</th><th>用例</th><th>类</th><th>基准状态</th><th>对比状态</th><th>失败信息</th></tr></thead>
+  <tbody>
+  {% for r in comparison['rows'] %}
+    <tr>
+      <td><span class="badge chg {{ r['change'] }}">{{ r['change'] }}</span></td>
+      <td>{{ r['name'] }}</td>
+      <td class="muted">{{ r['classname'] }}</td>
+      <td>{% if r['base_status'] %}<span class="badge {{ r['base_status'] }}">{{ r['base_status'] }}</span>{% else %}-{% endif %}</td>
+      <td>{% if r['target_status'] %}<span class="badge {{ r['target_status'] }}">{{ r['target_status'] }}</span>{% else %}-{% endif %}</td>
+      <td class="muted">{{ r['target_msg'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">两侧都没有用例，请重新选择。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="panel">
+  <p class="muted">选择两个运行记录进行对比，平台会自动归类：新增失败、仍失败、已修复、已移除等变化，用于回归测试分析。</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -2,24 +2,39 @@
 {% block title %}运行记录{% endblock %}
 {% block content %}
 <h1>运行记录</h1>
+<form class="filter" method="get">
+  <select name="project">
+    <option value="">全部项目</option>
+    {% for p in projects %}<option value="{{ p }}" {% if project == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <button type="submit">筛选</button>
+</form>
 <table>
-  <thead><tr><th>ID</th><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>耗时(s)</th><th>导入时间</th><th></th></tr></thead>
+  <thead><tr><th>ID</th><th>项目</th><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>通过率</th><th>耗时(s)</th><th>导入时间</th><th>操作</th></tr></thead>
   <tbody>
   {% for r in runs %}
+    {% set rate = (r['passed'] / r['total'] * 100) if r['total'] else 0 %}
     <tr>
       <td>{{ r['id'] }}</td>
+      <td><span class="badge project">{{ r['project'] }}</span></td>
       <td>{{ r['name'] }}</td>
       <td>{{ r['total'] }}</td>
       <td class="green">{{ r['passed'] }}</td>
       <td class="red">{{ r['failed'] }}</td>
       <td class="red">{{ r['errors'] }}</td>
       <td>{{ r['skipped'] }}</td>
+      <td>{{ '%.1f'|format(rate) }}%</td>
       <td>{{ r['duration'] }}</td>
       <td>{{ r['imported_at'] }}</td>
-      <td><a href="{{ url_for('run_detail', run_id=r['id']) }}">详情</a></td>
+      <td class="nowrap">
+        <a href="{{ url_for('run_detail', run_id=r['id']) }}">详情</a>
+        <form class="inline-form" method="post" action="{{ url_for('delete_run', run_id=r['id']) }}" onsubmit="return confirm('确认删除该运行记录及其用例？')">
+          <button class="btn-danger" type="submit">删除</button>
+        </form>
+      </td>
     </tr>
   {% else %}
-    <tr><td colspan="10">暂无数据。</td></tr>
+    <tr><td colspan="12">暂无数据。</td></tr>
   {% endfor %}
   </tbody>
 </table>

@@ -4,6 +4,8 @@
 <h1>导入测试报告</h1>
 <p class="muted">支持 pytest 的 JUnit XML（<code>pytest --junitxml=report.xml</code> 生成）。</p>
 <form method="post" enctype="multipart/form-data" class="panel">
+  <label>项目名称</label>
+  <input type="text" name="project" value="默认项目" placeholder="例如：model / blaster">
   <label>运行名称</label>
   <input type="text" name="name" placeholder="例如：backend-regression">
   <label>JUnit XML 文件</label>
