@@ -34,3 +34,10 @@ th { background: #f8fafc; color: #475569; }
 .filter button { background: #1f4e79; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; }
 pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow: auto; font-size: 13px; }
 .failure-row td { background: #fef2f2; }
+
+.trends { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+.trend-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+.trend-name { width: 260px; font-size: 13px; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trend-bar { flex: 1; height: 14px; background: #eef2f6; border-radius: 999px; overflow: hidden; }
+.trend-fill { height: 100%; background: #15803d; border-radius: 999px; }
+.trend-rate { width: 60px; text-align: right; font-size: 13px; color: #15803d; font-weight: 600; }

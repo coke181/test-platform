@@ -152,9 +152,10 @@ def index():
         "COALESCE(SUM(skipped),0) AS skipped FROM runs"
     ).fetchone()
     recent = db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT 5").fetchall()
+    trends = db.execute("SELECT id, name, passed, total FROM runs ORDER BY id ASC").fetchall()
     pass_rate = round(agg["passed"] / agg["total"] * 100, 1) if agg["total"] else 0
     return render_template("index.html", total_runs=total_runs, agg=agg,
-                           pass_rate=pass_rate, recent=recent)
+                           pass_rate=pass_rate, recent=recent, trends=trends)
 
 
 @app.route("/runs")

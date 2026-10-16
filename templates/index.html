@@ -1,5 +1,16 @@
 {% extends "base.html" %}
-{% block title %}仪表盘 - 测试报告平台{% endblock %}
+{% block title %}仪表盘 - 测试报告平台<h2>通过率趋势</h2>
+<div class="trends">
+{% for t in trends %}
+  {% set rate = (t['passed'] / t['total'] * 100) if t['total'] else 0 %}
+  <div class="trend-row">
+    <div class="trend-name">{{ t['name'] }}</div>
+    <div class="trend-bar"><div class="trend-fill" style="width: {{ '%.1f'|format(rate) }}%"></div></div>
+    <div class="trend-rate">{{ '%.1f'|format(rate) }}%</div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}
 {% block content %}
 <h1>仪表盘</h1>
 <div class="cards">
