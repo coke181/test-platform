@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ run['name'] }} - 运行详情{% endblock %}
+{% block content %}
+<h1>{{ run['name'] }}</h1>
+<p class="muted">导入时间：{{ run['imported_at'] }} &nbsp;|&nbsp; 耗时 {{ run['duration'] }}s</p>
+<div class="cards">
+  <div class="card"><div class="num">{{ run['total'] }}</div><div class="label">总数</div></div>
+  <div class="card"><div class="num green">{{ run['passed'] }}</div><div class="label">通过</div></div>
+  <div class="card"><div class="num red">{{ run['failed'] }}</div><div class="label">失败</div></div>
+  <div class="card"><div class="num red">{{ run['errors'] }}</div><div class="label">错误</div></div>
+  <div class="card"><div class="num">{{ run['skipped'] }}</div><div class="label">跳过</div></div>
+</div>
+
+<h2>用例明细</h2>
+<table>
+  <thead><tr><th>状态</th><th>用例</th><th>类</th><th>文件</th><th>耗时(s)</th></tr></thead>
+  <tbody>
+  {% for c in cases %}
+    <tr>
+      <td><span class="badge {{ c['status'] }}">{{ c['status'] }}</span></td>
+      <td>{{ c['name'] }}</td>
+      <td class="muted">{{ c['classname'] }}</td>
+      <td class="muted">{{ c['file'] }}{% if c['line'] %}:{{ c['line'] }}{% endif %}</td>
+      <td>{{ c['time'] }}</td>
+    </tr>
+    {% if c['message'] %}
+    <tr class="failure-row"><td colspan="5"><pre>{{ c['message'] }}</pre></td></tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

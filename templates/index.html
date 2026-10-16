@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - 测试报告平台{% endblock %}
+{% block content %}
+<h1>仪表盘</h1>
+<div class="cards">
+  <div class="card"><div class="num">{{ agg['total'] }}</div><div class="label">累计用例</div></div>
+  <div class="card"><div class="num green">{{ agg['passed'] }}</div><div class="label">通过</div></div>
+  <div class="card"><div class="num red">{{ agg['failed'] + agg['errors'] }}</div><div class="label">失败/错误</div></div>
+  <div class="card"><div class="num">{{ pass_rate }}%</div><div class="label">通过率</div></div>
+  <div class="card"><div class="num">{{ total_runs }}</div><div class="label">运行次数</div></div>
+</div>
+
+<h2>最近运行</h2>
+<table>
+  <thead><tr><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>耗时(s)</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for r in recent %}
+    <tr>
+      <td>{{ r['name'] }}</td>
+      <td>{{ r['total'] }}</td>
+      <td class="green">{{ r['passed'] }}</td>
+      <td class="red">{{ r['failed'] }}</td>
+      <td class="red">{{ r['errors'] }}</td>
+      <td>{{ r['skipped'] }}</td>
+      <td>{{ r['duration'] }}</td>
+      <td><a href="{{ url_for('run_detail', run_id=r['id']) }}">查看</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8">还没有数据，先 <a href="{{ url_for('import_page') }}">导入一份报告</a>。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

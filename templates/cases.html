@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}用例列表{% endblock %}
+{% block content %}
+<h1>用例列表</h1>
+<form class="filter" method="get">
+  <select name="status">
+    <option value="">全部状态</option>
+    <option value="passed" {% if status == 'passed' %}selected{% endif %}>通过</option>
+    <option value="failed" {% if status == 'failed' %}selected{% endif %}>失败</option>
+    <option value="error" {% if status == 'error' %}selected{% endif %}>错误</option>
+    <option value="skipped" {% if status == 'skipped' %}selected{% endif %}>跳过</option>
+  </select>
+  <input type="text" name="q" value="{{ q }}" placeholder="搜索用例名 / 类名 / 文件">
+  <button type="submit">筛选</button>
+</form>
+<table>
+  <thead><tr><th>状态</th><th>用例</th><th>类</th><th>所属运行</th><th>文件</th><th>耗时(s)</th></tr></thead>
+  <tbody>
+  {% for c in cases %}
+    <tr>
+      <td><span class="badge {{ c['status'] }}">{{ c['status'] }}</span></td>
+      <td>{{ c['name'] }}</td>
+      <td class="muted">{{ c['classname'] }}</td>
+      <td><a href="{{ url_for('run_detail', run_id=c['run_id']) }}">{{ c['run_name'] }}</a></td>
+      <td class="muted">{{ c['file'] }}</td>
+      <td>{{ c['time'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">没有匹配的用例。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

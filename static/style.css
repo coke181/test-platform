@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #f4f6fa; color: #1c2733; }
+.topbar { background: #1f4e79; color: #fff; display: flex; align-items: center; padding: 12px 24px; gap: 24px; }
+.brand { font-weight: 700; font-size: 18px; color: #fff; text-decoration: none; }
+.topbar nav a { color: #d7e3f4; text-decoration: none; margin-right: 16px; }
+.topbar nav a:hover { color: #fff; }
+.container { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
+h1 { font-size: 22px; color: #1f4e79; }
+h2 { font-size: 16px; color: #1f4e79; margin-top: 24px; }
+.cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; min-width: 140px; flex: 1; text-align: center; }
+.num { font-size: 26px; font-weight: 700; }
+.label { color: #64748b; font-size: 13px; margin-top: 4px; }
+.green { color: #15803d; }
+.red { color: #b91c1c; }
+.muted { color: #64748b; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e8f0; margin-top: 8px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef2f6; font-size: 14px; }
+th { background: #f8fafc; color: #475569; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.badge.passed { background: #dcfce7; color: #15803d; }
+.badge.failed { background: #fee2e2; color: #b91c1c; }
+.badge.error { background: #fee2e2; color: #b91c1c; }
+.badge.skipped { background: #f1f5f9; color: #64748b; }
+.flash { padding: 10px 14px; border-radius: 8px; margin: 10px 0; }
+.flash.ok { background: #dcfce7; color: #15803d; }
+.flash.error { background: #fee2e2; color: #b91c1c; }
+.panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; max-width: 520px; }
+.panel label { display: block; margin: 10px 0 4px; color: #475569; }
+.panel input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.panel button { margin-top: 14px; background: #1f4e79; color: #fff; border: 0; padding: 9px 18px; border-radius: 6px; cursor: pointer; }
+.filter { display: flex; gap: 8px; margin-bottom: 10px; }
+.filter select, .filter input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.filter button { background: #1f4e79; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; }
+pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow: auto; font-size: 13px; }
+.failure-row td { background: #fef2f2; }

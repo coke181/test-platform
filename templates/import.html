@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}导入报告{% endblock %}
+{% block content %}
+<h1>导入测试报告</h1>
+<p class="muted">支持 pytest 的 JUnit XML（<code>pytest --junitxml=report.xml</code> 生成）。</p>
+<form method="post" enctype="multipart/form-data" class="panel">
+  <label>运行名称</label>
+  <input type="text" name="name" placeholder="例如：backend-regression">
+  <label>JUnit XML 文件</label>
+  <input type="file" name="report" accept=".xml">
+  <button type="submit">导入</button>
+</form>
+
+<h2>生成报告的命令</h2>
+<pre>pytest --junitxml=report.xml</pre>
+<pre>pytest --junitxml=report.xml --html=report.html --self-contained-html</pre>
+{% endblock %}
