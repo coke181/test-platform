@@ -35,8 +35,8 @@ def main():
         print("junit file not found:", xml_path)
         return 1
 
-    url = (os.environ.get("TEST_PLATFORM_URL") or "").strip().rstrip("/")
-    token = (os.environ.get("TEST_PLATFORM_TOKEN") or "").strip()
+    url = (os.environ.get("TEST_PLATFORM_URL") or "").strip().lstrip("\ufeff").rstrip("/")
+    token = (os.environ.get("TEST_PLATFORM_TOKEN") or "").strip().lstrip("\ufeff")
     if not url or not token:
         print("TEST_PLATFORM_URL / TEST_PLATFORM_TOKEN 未配置，跳过上报")
         return 0
