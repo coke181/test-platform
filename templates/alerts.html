@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}告警通知{% endblock %}
+{% block content %}
+<h1>告警通知</h1>
+<p class="muted">每次导入报告后自动检查规则，命中就推 Webhook（钉钉 / 飞书 / Server 酱等）。</p>
+
+<h2>新建规则</h2>
+<form method="post" action="{{ url_for('alerts_new') }}" class="panel wide">
+  <label>规则名称 *</label>
+  <input type="text" name="name" required placeholder="例如：后端通过率低于 95% 告警">
+  <label>生效项目（留空 = 全部项目）</label>
+  <input type="text" name="project" placeholder="例如：model">
+  <label>指标 *</label>
+  <select name="metric">
+    <option value="pass_rate_below">通过率低于阈值</option>
+    <option value="new_failure">新增失败数达到阈值</option>
+    <option value="flaky_count_above">Flaky 用例数超过阈值</option>
+  </select>
+  <label>阈值</label>
+  <input type="number" name="threshold" step="any" value="95">
+  <label>Webhook 地址 *</label>
+  <input type="text" name="webhook_url" required placeholder="https://.../webhook">
+  <button type="submit">创建规则</button>
+</form>
+
+<h2>规则列表</h2>
+<table>
+  <thead><tr><th>ID</th><th>名称</th><th>项目</th><th>指标</th><th>阈值</th><th>Webhook</th><th>创建时间</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for r in rules %}
+    <tr>
+      <td>{{ r['id'] }}</td>
+      <td>{{ r['name'] }}</td>
+      <td><span class="badge project">{{ r['project'] or '全部项目' }}</span></td>
+      <td>{{ r['metric'] }}</td>
+      <td>{{ r['threshold'] }}</td>
+      <td class="muted">{{ r['webhook_url'] }}</td>
+      <td>{{ r['created_at'] }}</td>
+      <td class="nowrap">
+        <form class="inline-form" method="post" action="{{ url_for('alerts_test', rule_id=r['id']) }}">
+          <button type="submit">测试发送</button>
+        </form>
+        <form class="inline-form" method="post" action="{{ url_for('alerts_delete', rule_id=r['id']) }}" onsubmit="return confirm('确认删除该规则？')">
+          <button class="btn-danger" type="submit">删除</button>
+        </form>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8">还没有告警规则。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>发送记录</h2>
+<table>
+  <thead><tr><th>ID</th><th>规则</th><th>运行</th><th>状态</th><th>信息</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for l in logs %}
+    <tr>
+      <td>{{ l['id'] }}</td>
+      <td>{{ l['rule_id'] }}</td>
+      <td>{{ l['run_id'] or '-' }}</td>
+      <td><span class="badge {{ 'passed' if l['status'] == 'sent' else 'failed' }}">{{ l['status'] }}</span></td>
+      <td class="muted">{{ l['message'] }}</td>
+      <td>{{ l['created_at'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">还没有发送记录。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

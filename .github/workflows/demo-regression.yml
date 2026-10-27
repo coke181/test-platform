@@ -1,0 +1,56 @@
+name: demo-regression
+
+on:
+  schedule:
+    # UTC 17:00 = 北京时间次日 01:00
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+    inputs:
+      force_fail:
+        description: "是否制造一次演示失败"
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Run platform tests
+        run: pytest tests -q
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pytest
+
+      - name: Run demo tests
+        run: pytest demo_tests -q --junitxml=results/demo-junit.xml
+        env:
+          DEMO_FORCE_FAIL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_fail || '0' }}
+
+      - name: Report to test platform
+        run: python scripts/report_demo_to_platform.py results/demo-junit.xml
+        env:
+          TEST_PLATFORM_URL: ${{ secrets.TEST_PLATFORM_URL }}
+          TEST_PLATFORM_TOKEN: ${{ secrets.TEST_PLATFORM_TOKEN }}
+          TEST_PROJECT: demo
+          TEST_RUN_NAME: daily-regression

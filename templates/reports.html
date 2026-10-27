@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}质量报表{% endblock %}
+{% block content %}
+<h1>质量报表</h1>
+<form class="filter" method="get">
+  <select name="project">
+    <option value="">全部项目</option>
+    {% for p in projects %}<option value="{{ p }}" {% if project == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <button type="submit">查看</button>
+  <a class="btn-secondary" href="{{ url_for('reports_export', project=project) }}">导出 CSV</a>
+</form>
+
+<div class="cards">
+  <div class="card"><div class="num">{{ run_count }}</div><div class="label">运行次数</div></div>
+  <div class="card"><div class="num green">{{ avg_rate }}%</div><div class="label">平均通过率</div></div>
+  <div class="card"><div class="num">{{ avg_dur }}s</div><div class="label">平均耗时</div></div>
+  <div class="card"><div class="num red">{{ total_failures }}</div><div class="label">累计失败/错误</div></div>
+  <div class="card"><div class="num">{{ flaky_count }}</div><div class="label">Flaky 用例</div></div>
+</div>
+
+<h2>通过率趋势</h2>
+<div class="chart">
+{% if pass_points %}
+<svg viewBox="0 0 960 220" preserveAspectRatio="xMidYMid meet">
+  <line x1="26" y1="194" x2="934" y2="194" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="26" y1="26" x2="26" y2="194" stroke="#e2e8f0" stroke-width="1"/>
+  <polyline points="{{ pass_points }}" fill="none" stroke="#15803d" stroke-width="2.5"/>
+  <polygon points="26,194 {{ pass_points }} 934,194" fill="#15803d" fill-opacity="0.08"/>
+</svg>
+{% else %}
+<div class="muted">暂无数据。</div>
+{% endif %}
+</div>
+
+<h2>执行耗时趋势（秒）</h2>
+<div class="chart">
+{% if dur_points %}
+<svg viewBox="0 0 960 180" preserveAspectRatio="xMidYMid meet">
+  <line x1="26" y1="154" x2="934" y2="154" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="26" y1="26" x2="26" y2="154" stroke="#e2e8f0" stroke-width="1"/>
+  <polyline points="{{ dur_points }}" fill="none" stroke="#1f4e79" stroke-width="2.5"/>
+  <polygon points="26,154 {{ dur_points }} 934,154" fill="#1f4e79" fill-opacity="0.08"/>
+</svg>
+{% else %}
+<div class="muted">暂无数据。</div>
+{% endif %}
+</div>
+
+<h2>失败根因 Top10</h2>
+<table>
+  <thead><tr><th>根因签名</th><th>失败次数</th><th>影响用例数</th><th>示例信息</th></tr></thead>
+  <tbody>
+  {% for cl in clusters %}
+    <tr>
+      <td><code>{{ cl['signature'] }}</code></td>
+      <td class="red">{{ cl['count'] }}</td>
+      <td>{{ cl['case_count'] }}</td>
+      <td class="muted">{{ cl['sample_message'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">暂无失败数据。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>运行明细</h2>
+<table>
+  <thead><tr><th>项目</th><th>名称</th><th>总数</th><th>通过</th><th>失败</th><th>错误</th><th>跳过</th><th>通过率</th><th>耗时(s)</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td><span class="badge project">{{ r['project'] }}</span></td>
+      <td><a href="{{ url_for('run_detail', run_id=r['id']) }}">{{ r['name'] }}</a></td>
+      <td>{{ r['total'] }}</td>
+      <td class="green">{{ r['passed'] }}</td>
+      <td class="red">{{ r['failed'] }}</td>
+      <td class="red">{{ r['errors'] }}</td>
+      <td>{{ r['skipped'] }}</td>
+      <td>{{ '%.1f'|format(r['rate']) }}%</td>
+      <td>{{ r['duration'] }}</td>
+      <td class="muted">{{ r['imported_at'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="10">暂无运行数据。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

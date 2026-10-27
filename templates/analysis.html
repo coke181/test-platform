@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}质量分析 - 测试报告平台{% endblock %}
+{% block content %}
+<h1>质量分析</h1>
+<form class="filter" method="get">
+  <select name="project">
+    <option value="">全部项目</option>
+    {% for p in projects %}<option value="{{ p }}" {% if project == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <label>分析最近</label>
+  <select name="limit">
+    <option value="10" {% if limit == 10 %}selected{% endif %}>10 次运行</option>
+    <option value="20" {% if limit == 20 %}selected{% endif %}>20 次运行</option>
+    <option value="50" {% if limit == 50 %}selected{% endif %}>50 次运行</option>
+  </select>
+  <button type="submit">分析</button>
+</form>
+
+<div class="cards">
+  <div class="card"><div class="num">{{ data['run_count'] }}</div><div class="label">参与分析的运行</div></div>
+  <div class="card"><div class="num">{{ data['case_count'] }}</div><div class="label">参与分析的用例记录</div></div>
+  <div class="card"><div class="num red">{{ data['total_failures'] }}</div><div class="label">失败/错误</div></div>
+  <div class="card"><div class="num">{{ data['flaky_rate'] }}%</div><div class="label">Flaky 占比</div></div>
+</div>
+
+<h2>Flaky 用例（近 {{ data['run_count'] }} 次运行时好时坏）</h2>
+<table>
+  <thead><tr><th>用例</th><th>类</th><th>出现次数</th><th>失败</th><th>通过</th><th>最近状态</th><th>最近失败信息</th></tr></thead>
+  <tbody>
+  {% for f in data['flaky'] %}
+    <tr>
+      <td>{{ f['name'] }}</td>
+      <td class="muted">{{ f['classname'] }}</td>
+      <td>{{ f['total_runs'] }}</td>
+      <td class="red">{{ f['fail_count'] }}</td>
+      <td class="green">{{ f['pass_count'] }}</td>
+      <td><span class="badge {{ f['last_status'] }}">{{ f['last_status'] }}</span></td>
+      <td class="muted">{{ f['last_message'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7">最近 {{ data['run_count'] }} 次运行里没有发现 Flaky 用例。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>失败根因聚类</h2>
+<p class="muted">按失败信息签名（去掉数字 / 路径 / 时间戳等噪声）自动归类，同一根因下的失败会被合并。</p>
+<table>
+  <thead><tr><th>根因签名</th><th>失败次数</th><th>影响用例数</th><th>示例用例</th><th>示例信息</th></tr></thead>
+  <tbody>
+  {% for cl in data['clusters'] %}
+    <tr>
+      <td><code>{{ cl['signature'] }}</code></td>
+      <td class="red">{{ cl['count'] }}</td>
+      <td>{{ cl['case_count'] }}</td>
+      <td>{{ cl['sample_case'] }}</td>
+      <td class="muted">{{ cl['sample_message'] }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">最近没有失败记录，无法聚类。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

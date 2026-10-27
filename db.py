@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS test_cases (
     steps TEXT,
     expected TEXT,
     project TEXT DEFAULT '默认项目',
+    automation_id TEXT DEFAULT '',
+    tags TEXT DEFAULT '',
     created_at TEXT
 );
 
@@ -50,5 +52,26 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at TEXT,
     FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE,
     FOREIGN KEY(case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS alert_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    project TEXT DEFAULT '',
+    metric TEXT NOT NULL,
+    threshold REAL NOT NULL DEFAULT 0,
+    webhook_url TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS alert_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id INTEGER,
+    run_id INTEGER,
+    status TEXT,
+    message TEXT,
+    created_at TEXT,
+    FOREIGN KEY(rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL
 );
 """

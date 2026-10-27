@@ -19,6 +19,10 @@
   <textarea name="precondition" rows="3">{{ case['precondition'] if case else '' }}</textarea>
   <label>操作步骤</label>
   <textarea name="steps" rows="5">{{ case['steps'] if case else '' }}</textarea>
+  <label>自动化用例 ID（对应 JUnit 的 classname::name，用于覆盖率统计）</label>
+  <input type="text" name="automation_id" value="{{ case['automation_id'] if case else '' }}" placeholder="例如：tests/test_api.py::test_login">
+  <label>标签（逗号分隔）</label>
+  <input type="text" name="tags" value="{{ case['tags'] if case else '' }}" placeholder="例如：核心链路, 回归">
   <label>预期结果</label>
   <textarea name="expected" rows="3">{{ case['expected'] if case else '' }}</textarea>
   <div class="toolbar">

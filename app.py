@@ -10,15 +10,19 @@
     python app.py
 然后浏览器打开 http://127.0.0.1:5000
 """
+import csv
+import io
+import json
 import os
 import re
+import urllib.request
 import secrets
 import sqlite3
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
-from flask import (Flask, g, jsonify, render_template, request, redirect, url_for, flash, send_from_directory)
+from flask import (Flask, Response, g, jsonify, render_template, request, redirect, url_for, flash, send_from_directory)
 
 from db import SCHEMA
 
@@ -64,6 +68,8 @@ def _migrate(db):
     for table, column, ddl in (
         ("runs", "project", "TEXT NOT NULL DEFAULT '默认项目'"),
         ("test_cases", "project", "TEXT DEFAULT '默认项目'"),
+        ("test_cases", "automation_id", "TEXT DEFAULT ''"),
+        ("test_cases", "tags", "TEXT DEFAULT ''"),
     ):
         cols = [row[1] for row in db.execute("PRAGMA table_info(%s)" % table).fetchall()]
         if column not in cols:
@@ -216,6 +222,437 @@ def import_run(run, cases):
     return run_id
 
 
+def case_key(c):
+    return ((c["classname"] or "") + "::" + (c["name"] or ""))
+
+
+def failure_signature(text):
+    if not text or not text.strip():
+        return "(无失败信息)"
+    s = text.strip()
+    s = re.sub(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "UUID", s)
+    s = re.sub(r"\b0x[0-9a-fA-F]+\b", "HEX", s)
+    s = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", "IP", s)
+    s = re.sub(r"[A-Za-z]:[\\/][^\s\"']+", "PATH", s)
+    s = re.sub(r"(?<=[^\w])/[^\s\"']+", "PATH", s)
+    s = re.sub(r"\b\d+(?:\.\d+)?\b", "N", s)
+    s = re.sub(r'"[^"]*"', 'STR', s)
+    s = re.sub(r"'[^']*'", 'STR', s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s[:200]
+
+
+def analyze_project(project, run_limit=20, cluster_limit=20):
+    db = get_db()
+    if project:
+        recent = db.execute(
+            "SELECT * FROM runs WHERE project = ? ORDER BY id DESC LIMIT ?",
+            (project, run_limit),
+        ).fetchall()
+    else:
+        recent = db.execute(
+            "SELECT * FROM runs ORDER BY id DESC LIMIT ?",
+            (run_limit,),
+        ).fetchall()
+
+    run_ids = [r["id"] for r in recent]
+    if not run_ids:
+        return {
+            "project": project,
+            "run_limit": run_limit,
+            "run_count": 0,
+            "case_count": 0,
+            "flaky": [],
+            "flaky_count": 0,
+            "flaky_rate": 0,
+            "clusters": [],
+            "total_failures": 0,
+        }
+
+    placeholders = ",".join("?" for _ in run_ids)
+    case_rows = db.execute(
+        "SELECT * FROM cases WHERE run_id IN (%s) ORDER BY id DESC" % placeholders,
+        run_ids,
+    ).fetchall()
+
+    BAD = ("failed", "error")
+    groups = {}
+    for c in case_rows:
+        key = case_key(c)
+        groups.setdefault(key, []).append(c)
+
+    flaky = []
+    for key, items in groups.items():
+        if len(items) < 2:
+            continue
+        statuses = [c["status"] for c in items]
+        fail_count = sum(1 for s in statuses if s in BAD)
+        pass_count = sum(1 for s in statuses if s == "passed")
+        if fail_count > 0 and pass_count > 0:
+            latest = items[0]
+            flaky.append({
+                "key": key,
+                "name": latest["name"],
+                "classname": latest["classname"],
+                "total_runs": len(items),
+                "fail_count": fail_count,
+                "pass_count": pass_count,
+                "last_status": latest["status"],
+                "last_message": (latest["message"] or "")[:200],
+            })
+    flaky.sort(key=lambda x: (-x["fail_count"], x["key"]))
+
+    clusters = {}
+    total_failures = 0
+    for c in case_rows:
+        if c["status"] not in BAD:
+            continue
+        total_failures += 1
+        raw = c["message"] or c["traceback"] or ""
+        sig = failure_signature(raw)
+        bucket = clusters.setdefault(sig, {
+            "signature": sig,
+            "count": 0,
+            "cases": set(),
+            "sample_message": "",
+            "sample_case": "",
+        })
+        bucket["count"] += 1
+        bucket["cases"].add(case_key(c))
+        if not bucket["sample_message"]:
+            bucket["sample_message"] = (c["message"] or c["traceback"] or "")[:300]
+            bucket["sample_case"] = (c["name"] or "")[:120]
+    cluster_list = []
+    for bucket in clusters.values():
+        cluster_list.append({
+            "signature": bucket["signature"],
+            "count": bucket["count"],
+            "case_count": len(bucket["cases"]),
+            "sample_case": bucket["sample_case"],
+            "sample_message": bucket["sample_message"],
+        })
+    cluster_list.sort(key=lambda x: (-x["count"], x["signature"]))
+    cluster_list = cluster_list[:cluster_limit]
+
+    flaky_rate = round(len(flaky) / len(groups) * 100, 1) if groups else 0
+    return {
+        "project": project,
+        "run_limit": run_limit,
+        "run_count": len(recent),
+        "case_count": len(case_rows),
+        "flaky": flaky,
+        "flaky_count": len(flaky),
+        "flaky_rate": flaky_rate,
+        "clusters": cluster_list,
+        "total_failures": total_failures,
+    }
+
+
+@app.route("/analysis")
+def analysis():
+    db = get_db()
+    projects = [r["project"] for r in db.execute(
+        "SELECT DISTINCT project FROM runs WHERE project IS NOT NULL AND project != '' ORDER BY project"
+    ).fetchall()]
+    project = request.args.get("project", "").strip()
+    limit = request.args.get("limit", 20, type=int)
+    data = analyze_project(project, run_limit=limit)
+    return render_template("analysis.html", projects=projects, project=project,
+                           data=data, limit=limit)
+
+
+@app.route("/api/analysis")
+def api_analysis():
+    project = request.args.get("project", "").strip()
+    limit = request.args.get("limit", 20, type=int)
+    return jsonify(analyze_project(project, run_limit=limit))
+
+
+def send_webhook(url, payload):
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return True, "HTTP %s" % resp.status
+    except Exception as exc:
+        return False, str(exc)
+
+
+def evaluate_alerts(run_id):
+    db = get_db()
+    run = db.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+    if run is None:
+        return []
+    project = run["project"] or "默认项目"
+    rules = db.execute(
+        "SELECT * FROM alert_rules WHERE enabled = 1 AND (project = '' OR project = ?)",
+        (project,),
+    ).fetchall()
+    if not rules:
+        return []
+
+    total = run["total"] or 0
+    passed = run["passed"] or 0
+    pass_rate = round(passed / total * 100, 1) if total else 100.0
+
+    prev = db.execute(
+        "SELECT * FROM runs WHERE project = ? AND id < ? ORDER BY id DESC LIMIT 1",
+        (project, run_id),
+    ).fetchone()
+    BAD = ("failed", "error")
+    if prev:
+        prev_cases = db.execute("SELECT * FROM cases WHERE run_id = ?", (prev["id"],)).fetchall()
+        cur_cases = db.execute("SELECT * FROM cases WHERE run_id = ?", (run_id,)).fetchall()
+        prev_status = {case_key(c): c["status"] for c in prev_cases}
+        new_failures = 0
+        for c in cur_cases:
+            if c["status"] in BAD:
+                old = prev_status.get(case_key(c))
+                if old is None or old not in BAD:
+                    new_failures += 1
+    else:
+        new_failures = (run["failed"] or 0) + (run["errors"] or 0)
+
+    flaky_count = analyze_project(project, run_limit=20)["flaky_count"]
+
+    logs = []
+    for rule in rules:
+        metric = rule["metric"]
+        if metric == "pass_rate_below":
+            value = pass_rate
+        elif metric == "new_failure":
+            value = new_failures
+        elif metric == "flaky_count_above":
+            value = flaky_count
+        else:
+            continue
+
+        threshold = float(rule["threshold"] or 0)
+        triggered = value < threshold if metric == "pass_rate_below" else value >= threshold
+        if not triggered:
+            continue
+
+        payload = {
+            "event": "test-platform-alert",
+            "rule": rule["name"],
+            "project": project,
+            "run": run["name"],
+            "run_id": run_id,
+            "metric": metric,
+            "value": value,
+            "threshold": threshold,
+            "pass_rate": pass_rate,
+            "failed": run["failed"],
+            "errors": run["errors"],
+            "new_failures": new_failures,
+            "flaky_count": flaky_count,
+        }
+        ok, message = send_webhook(rule["webhook_url"], payload)
+        db.execute(
+            "INSERT INTO alert_logs(rule_id, run_id, status, message, created_at) VALUES (?, ?, ?, ?, ?)",
+            (rule["id"], run_id, "sent" if ok else "failed", message[:500], now_iso()),
+        )
+        logs.append({"rule": rule["name"], "status": "sent" if ok else "failed", "message": message})
+    db.commit()
+    return logs
+
+
+def coverage_stats(db, project):
+    if project:
+        rows = db.execute(
+            "SELECT id, automation_id FROM test_cases WHERE project = ?",
+            (project,),
+        ).fetchall()
+    else:
+        rows = db.execute("SELECT id, automation_id FROM test_cases").fetchall()
+
+    total = len(rows)
+    linked = sum(1 for r in rows if (r["automation_id"] or "").strip())
+    executed_keys = set()
+    if rows:
+        for r in db.execute(
+            "SELECT DISTINCT (COALESCE(classname,'') || '::' || COALESCE(name,'')) AS key FROM cases"
+        ).fetchall():
+            if r["key"]:
+                executed_keys.add(r["key"])
+    covered = sum(1 for r in rows if (r["automation_id"] or "").strip() and r["automation_id"] in executed_keys)
+    rate = round(covered / total * 100, 1) if total else 0
+    return {"total": total, "linked": linked, "covered": covered, "rate": rate}
+
+
+def automation_status(db, rows):
+    ids = [r["automation_id"] for r in rows if (r["automation_id"] or "").strip()]
+    result = {}
+    if not ids:
+        return result
+    placeholders = ",".join("?" for _ in ids)
+    sql = (
+        "SELECT (COALESCE(classname,'') || '::' || COALESCE(name,'')) AS key, status "
+        "FROM cases WHERE (COALESCE(classname,'') || '::' || COALESCE(name,'')) IN (%s) "
+        "ORDER BY id DESC" % placeholders
+    )
+    for r in db.execute(sql, ids).fetchall():
+        if r["key"] not in result:
+            result[r["key"]] = r["status"]
+    return result
+
+
+@app.route("/alerts")
+def alerts():
+    db = get_db()
+    projects = [r["project"] for r in db.execute(
+        "SELECT DISTINCT project FROM runs WHERE project IS NOT NULL AND project != '' ORDER BY project"
+    ).fetchall()]
+    rules = db.execute("SELECT * FROM alert_rules ORDER BY id DESC").fetchall()
+    logs = db.execute("SELECT * FROM alert_logs ORDER BY id DESC LIMIT 50").fetchall()
+    return render_template("alerts.html", projects=projects, rules=rules, logs=logs)
+
+
+@app.route("/alerts/new", methods=["POST"])
+def alerts_new():
+    name = request.form.get("name", "").strip()
+    webhook_url = request.form.get("webhook_url", "").strip()
+    metric = request.form.get("metric", "").strip()
+    if not name or not webhook_url or metric not in ("pass_rate_below", "new_failure", "flaky_count_above"):
+        flash("名称、Webhook 地址和指标均不能为空", "error")
+        return redirect(url_for("alerts"))
+    try:
+        threshold = float(request.form.get("threshold", "0"))
+    except ValueError:
+        threshold = 0
+    db = get_db()
+    db.execute(
+        "INSERT INTO alert_rules(name, project, metric, threshold, webhook_url, enabled, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 1, ?)",
+        (name, request.form.get("project", "").strip(), metric, threshold, webhook_url, now_iso()),
+    )
+    db.commit()
+    flash("告警规则已创建", "ok")
+    return redirect(url_for("alerts"))
+
+
+@app.route("/alerts/<int:rule_id>/delete", methods=["POST"])
+def alerts_delete(rule_id):
+    db = get_db()
+    db.execute("DELETE FROM alert_rules WHERE id = ?", (rule_id,))
+    db.commit()
+    flash("告警规则已删除", "ok")
+    return redirect(url_for("alerts"))
+
+
+@app.route("/alerts/<int:rule_id>/test", methods=["POST"])
+def alerts_test(rule_id):
+    db = get_db()
+    rule = db.execute("SELECT * FROM alert_rules WHERE id = ?", (rule_id,)).fetchone()
+    if rule is None:
+        flash("告警规则不存在", "error")
+        return redirect(url_for("alerts"))
+    payload = {"event": "test-platform-alert-test", "rule": rule["name"], "message": "这是一条测试消息"}
+    ok, message = send_webhook(rule["webhook_url"], payload)
+    db.execute(
+        "INSERT INTO alert_logs(rule_id, run_id, status, message, created_at) VALUES (?, NULL, ?, ?, ?)",
+        (rule["id"], "sent" if ok else "failed", message[:500], now_iso()),
+    )
+    db.commit()
+    flash(("测试发送成功：" if ok else "测试发送失败：") + message, "ok" if ok else "error")
+    return redirect(url_for("alerts"))
+
+
+@app.route("/api/alerts")
+def api_alerts():
+    db = get_db()
+    rules = db.execute("SELECT * FROM alert_rules ORDER BY id DESC").fetchall()
+    logs = db.execute("SELECT * FROM alert_logs ORDER BY id DESC LIMIT 100").fetchall()
+    return jsonify({"rules": [dict(r) for r in rules], "logs": [dict(l) for l in logs]})
+
+
+def _svg_points(values, width, height, pad=26.0, ymin=None, ymax=None):
+    if not values:
+        return ""
+    if ymin is None:
+        ymin = min(values)
+    if ymax is None:
+        ymax = max(values)
+    if ymax - ymin < 1e-9:
+        ymin -= 1
+        ymax += 1
+    inner_w = width - 2 * pad
+    inner_h = height - 2 * pad
+    n = len(values)
+    pts = []
+    for i, v in enumerate(values):
+        x = pad + (i * inner_w / (n - 1) if n > 1 else inner_w / 2)
+        y = height - pad - (v - ymin) / (ymax - ymin) * inner_h
+        pts.append("%.1f,%.1f" % (x, y))
+    return " ".join(pts)
+
+
+@app.route("/reports")
+def reports():
+    db = get_db()
+    project = request.args.get("project", "").strip()
+    where = " WHERE project = ?" if project else ""
+    params = [project] if project else []
+
+    runs = db.execute("SELECT * FROM runs" + where + " ORDER BY id ASC", params).fetchall()
+    run_rows = []
+    pass_rates = []
+    durations = []
+    total_failures = 0
+    for r in runs:
+        total = r["total"] or 0
+        rate = round(r["passed"] / total * 100, 1) if total else 0
+        dur = round(r["duration"] or 0, 3)
+        run_rows.append({
+            "id": r["id"], "name": r["name"], "project": r["project"],
+            "total": r["total"], "passed": r["passed"], "failed": r["failed"],
+            "errors": r["errors"], "skipped": r["skipped"], "duration": dur,
+            "rate": rate, "imported_at": r["imported_at"],
+        })
+        pass_rates.append(rate)
+        durations.append(dur)
+        total_failures += (r["failed"] or 0) + (r["errors"] or 0)
+
+    avg_rate = round(sum(pass_rates) / len(pass_rates), 1) if pass_rates else 0
+    avg_dur = round(sum(durations) / len(durations), 3) if durations else 0
+    analysis_data = analyze_project(project, run_limit=20)
+    pass_points = _svg_points(pass_rates, 960, 220, ymin=0, ymax=100)
+    dur_points = _svg_points(durations, 960, 180)
+    projects = [r["project"] for r in db.execute(
+        "SELECT DISTINCT project FROM runs WHERE project IS NOT NULL AND project != '' ORDER BY project"
+    ).fetchall()]
+    return render_template(
+        "reports.html", runs=run_rows, project=project, projects=projects,
+        run_count=len(run_rows), avg_rate=avg_rate, avg_dur=avg_dur,
+        total_failures=total_failures, flaky_count=analysis_data["flaky_count"],
+        clusters=analysis_data["clusters"][:10],
+        pass_points=pass_points, dur_points=dur_points,
+    )
+
+
+@app.route("/reports/export.csv")
+def reports_export():
+    db = get_db()
+    project = request.args.get("project", "").strip()
+    where = " WHERE project = ?" if project else ""
+    params = [project] if project else []
+    rows = db.execute("SELECT * FROM runs" + where + " ORDER BY id ASC", params).fetchall()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "project", "name", "total", "passed", "failed", "errors",
+                     "skipped", "pass_rate", "duration", "imported_at"])
+    for r in rows:
+        total = r["total"] or 0
+        rate = round(r["passed"] / total * 100, 1) if total else 0
+        writer.writerow([r["id"], r["project"], r["name"], r["total"], r["passed"],
+                         r["failed"], r["errors"], r["skipped"], rate,
+                         r["duration"], r["imported_at"]])
+    csv_text = buf.getvalue()
+    return Response("\ufeff" + csv_text, mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=test-report.csv"})
+
+
 @app.route("/")
 def index():
     db = get_db()
@@ -344,6 +781,7 @@ def import_page():
             flash("XML 解析失败：" + str(exc), "error")
             return redirect(url_for("import_page"))
         run_id = import_run(run, case_list)
+        evaluate_alerts(run_id)
         flash("导入成功：共 %d 条用例" % run["total"], "ok")
         return redirect(url_for("run_detail", run_id=run_id))
     return render_template("import.html")
@@ -379,9 +817,12 @@ def library():
     projects = [r["project"] for r in db.execute(
         "SELECT DISTINCT project FROM test_cases WHERE project IS NOT NULL AND project != '' ORDER BY project"
     ).fetchall()]
+    coverage = coverage_stats(db, project)
+    status_by_key = automation_status(db, rows)
     return render_template("library.html", cases=rows, q=q, module=module,
                            priority=priority, project=project, modules=modules,
-                           projects=projects)
+                           projects=projects, coverage=coverage,
+                           status_by_key=status_by_key)
 
 
 @app.route("/library/new", methods=["GET", "POST"])
@@ -393,8 +834,8 @@ def library_new():
             return redirect(url_for("library_new"))
         db = get_db()
         db.execute(
-            "INSERT INTO test_cases(title, module, priority, precondition, steps, expected, project, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO test_cases(title, module, priority, precondition, steps, expected, project, automation_id, tags, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (title,
              request.form.get("module", "").strip(),
              request.form.get("priority", "P2").strip(),
@@ -402,6 +843,8 @@ def library_new():
              request.form.get("steps", "").strip(),
              request.form.get("expected", "").strip(),
              request.form.get("project", "").strip() or "默认项目",
+             request.form.get("automation_id", "").strip(),
+             request.form.get("tags", "").strip(),
              now_iso()),
         )
         db.commit()
@@ -423,7 +866,7 @@ def library_edit(case_id):
             flash("标题不能为空", "error")
             return redirect(url_for("library_edit", case_id=case_id))
         db.execute(
-            "UPDATE test_cases SET title=?, module=?, priority=?, precondition=?, steps=?, expected=?, project=? "
+            "UPDATE test_cases SET title=?, module=?, priority=?, precondition=?, steps=?, expected=?, project=?, automation_id=?, tags=? "
             "WHERE id=?", (
                 title,
                 request.form.get("module", "").strip(),
@@ -432,6 +875,8 @@ def library_edit(case_id):
                 request.form.get("steps", "").strip(),
                 request.form.get("expected", "").strip(),
                 request.form.get("project", "").strip() or "默认项目",
+                request.form.get("automation_id", "").strip(),
+                request.form.get("tags", "").strip(),
                 case_id,
             ),
         )
@@ -472,10 +917,11 @@ def api_import():
     except ET.ParseError as exc:
         return jsonify({"error": "xml parse failed: " + str(exc)}), 400
     run_id = import_run(run, case_list)
+    alerts = evaluate_alerts(run_id)
     return jsonify({"run_id": run_id, "name": run_name, "project": project,
                     "total": run["total"], "passed": run["passed"],
                     "failed": run["failed"], "errors": run["errors"],
-                    "skipped": run["skipped"]})
+                    "skipped": run["skipped"], "alerts": alerts})
 
 
 @app.route("/api/runs")

@@ -2,7 +2,13 @@
 {% block title %}用例库{% endblock %}
 {% block content %}
 <h1>用例库</h1>
-<p class="muted">手动维护的测试用例，与导入的运行报告相互独立。</p>
+<p class="muted">手动维护的测试用例；填写「自动化用例 ID」后可与运行报告关联，统计自动化覆盖率。</p>
+<div class="cards">
+  <div class="card"><div class="num">{{ coverage['total'] }}</div><div class="label">用例总数</div></div>
+  <div class="card"><div class="num">{{ coverage['linked'] }}</div><div class="label">已关联自动化</div></div>
+  <div class="card"><div class="num green">{{ coverage['covered'] }}</div><div class="label">已被执行覆盖</div></div>
+  <div class="card"><div class="num">{{ coverage['rate'] }}%</div><div class="label">自动化覆盖率</div></div>
+</div>
 <div class="toolbar">
   <a class="btn" href="{{ url_for('library_new') }}">新建用例</a>
 </div>
@@ -23,7 +29,7 @@
   <button type="submit">筛选</button>
 </form>
 <table>
-  <thead><tr><th>ID</th><th>标题</th><th>项目</th><th>模块</th><th>优先级</th><th>步骤</th><th>预期结果</th><th>创建时间</th><th>操作</th></tr></thead>
+  <thead><tr><th>ID</th><th>标题</th><th>项目</th><th>模块</th><th>优先级</th><th>自动化ID</th><th>覆盖状态</th><th>创建时间</th><th>操作</th></tr></thead>
   <tbody>
   {% for c in cases %}
     <tr>
@@ -32,8 +38,17 @@
       <td><span class="badge project">{{ c['project'] }}</span></td>
       <td>{{ c['module'] }}</td>
       <td><span class="badge pri {{ c['priority']|lower }}">{{ c['priority'] }}</span></td>
-      <td class="muted">{{ c['steps'] }}</td>
-      <td class="muted">{{ c['expected'] }}</td>
+      <td class="muted">{{ c['automation_id'] or '-' }}</td>
+      <td>
+        {% set key = c['automation_id'] %}
+        {% if not key %}
+          <span class="badge skipped">未关联</span>
+        {% elif key in status_by_key %}
+          <span class="badge {{ status_by_key[key] }}">{{ status_by_key[key] }}</span>
+        {% else %}
+          <span class="badge skipped">未执行</span>
+        {% endif %}
+      </td>
       <td>{{ c['created_at'] }}</td>
       <td class="nowrap">
         <a href="{{ url_for('library_edit', case_id=c['id']) }}">编辑</a>
@@ -43,7 +58,7 @@
       </td>
     </tr>
   {% else %}
-    <tr><td colspan="9">暂无用例，点右上角“新建用例”开始。</td></tr>
+    <tr><td colspan="9">暂无用例，点“新建用例”开始。</td></tr>
   {% endfor %}
   </tbody>
 </table>
